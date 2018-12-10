@@ -1,0 +1,575 @@
+import matplotlib.pyplot as plt
+%matplotlib inline
+
+import numpy as np
+
+nx = 40
+ny = 40
+fenceline = 10
+
+states = ['empty','fence','sheep','dog']
+state_color = np.linspace(0,1,len(states))
+
+system_state = np.zeros([ny,nx]) # intialize everything to empty
+
+dog_start_pos = [int(ny-1),int(nx/2)]
+system_state[dog_start_pos[0],dog_start_pos[1]] = 3  # put a dog at the top, in the middle
+system_state[fenceline,:] = 1                 # put a fence along y = 10
+system_state[fenceline,17:24] = 0             # put a hole in the fence
+
+def plotstate(state,time=0):
+    
+    # first create two vectors based on the x and y sizes of the grid
+    x_range = np.linspace(0, state.shape[0], state.shape[0]) 
+    y_range = np.linspace(0, state.shape[1], state.shape[1])
+    
+    # use the numpy meshgrid function to create two matrices 
+    # of the same size as myarray with x and y indexes
+    x_indexes, y_indexes = np.meshgrid(x_range, y_range)
+    
+    # make a list of all the x and y indexes that are not empty.
+    fence_x = x_indexes[state == 1];
+    fence_y = y_indexes[state == 1]; 
+    sheep_x = x_indexes[state == 2]; 
+    sheep_y = y_indexes[state == 2];
+    dog_x = x_indexes[state == 3]; 
+    dog_y = y_indexes[state == 3];
+ 
+    # plot the squares and triangles.  make the size of the polygons 
+    # larger than the default so they're easy to see!   
+    plt.plot(fence_x,fence_y, 's',markersize=20)  
+    plt.plot(sheep_x,sheep_y, 'o',markersize=20)  
+    plt.plot(dog_x,dog_y, '1',markersize=20)
+    
+    # Set the x and y limits to include half a space overlap so we don't cut off the shapes
+    plt.ylim([-0.5,state.shape[0] + 0.5]) 
+    plt.xlim([-0.5,state.shape[0] + 0.5])
+    
+    # display the current time on the plot
+    plt.text(0,0,"time={0}".format(time),fontsize=18)
+    
+    # Turn the axes off
+    plt.tick_params(axis='both', which='both', bottom=False, top=False, labelbottom=False, right=False, left=False, labelleft=False)
+    plt.gca().set_aspect('equal', adjustable='box')
+
+from copy import copy
+
+def place_sheep(state,N,fenceline):
+    
+    newstate = copy(state)
+    
+    sheep_placed = 0
+    while sheep_placed < N:
+        # suggest somewhere for a sheep to be placed 
+        try_y = np.random.randint(fenceline + 1,ny) # hint: use np.random.randint
+        try_x = np.random.randint(0,nx)# 
+        
+        good_place = None
+        # check if this is appropriate.
+        if newstate[try_y, try_x] == 0:
+            good_place = True
+        else:
+            good_place = False
+        # if yes, set good_place to True.  if no, set good_place to False.
+        
+        # if good, place the sheep, if not try again
+        if good_place is True:
+            sheep_placed += 1
+            newstate[try_y,try_x] = 2
+    
+    return newstate
+    
+    def move_sheep(state,sheep_x,sheep_y,pmove,fenceline):
+
+    # what are the next two lines doing?
+    # It is deciding if the sheep should move based off of a pmove probablility.
+    r1 = np.random.random()
+    if r1 < pmove:
+        # now decide to move up, down, left or right
+        # store the new location in the variables try_x and try_y
+
+        r2 = np.random.random()
+        if r2 < 0.25: # move left
+            try_x = sheep_x - 1
+            try_y = sheep_y
+        elif r2 < 0.5: # move up
+            if sheep_y != fenceline:
+                try_x = sheep_x
+                try_y = sheep_y + 1
+            else:
+                try_x = sheep_x
+                try_y = sheep_y
+        elif r2 < 0.75: # move right
+            try_x = sheep_x + 1
+            try_y = sheep_y
+        else: # move down
+            try_x = sheep_x
+            try_y = sheep_y - 1
+
+        # check and see if the move is good
+        good_move = True
+        
+        # set good_move to False if conditions are violated
+        if try_x < 0 or try_x >= state.shape[1]:
+            good_move = False
+        elif try_y < 0 or try_y >= state.shape[0]:
+            good_move = False
+        elif state[try_y,try_x] != 0:
+            good_move = False
+            
+        # check if the move is good, if so make the move
+        if good_move == True:
+            state[try_y,try_x] = 2
+            state[sheep_y, sheep_x] = 0
+    
+    # return the state
+    return state
+    
+    sheep_loc = np.array(np.where(initial_state==2))
+    
+    x = sheep_loc[1][0]
+y = sheep_loc[0][0]
+print("There is a sheep at x, y = ({0},{1})".format(x,y))
+
+nsheep = sheep_loc.shape[1]
+print("There are {0} sheep in total".format(nsheep))
+
+def evolve_system(state,pmove,fenceline):
+    sheep_loc = np.array(np.where(state==2))
+    
+    # use sheep_loc to determine how many sheep there are
+    nsheep = sheep_loc.shape[1]
+    
+    # write a loop to iterate over each sheep
+    for i in range(nsheep):
+        sheep_x = sheep_loc[1][i]
+        sheep_y = sheep_loc[0][i]
+        # call move_sheep for each sheep_x and sheep_y position
+        state = move_sheep(state,sheep_x,sheep_y,pmove,fenceline)
+
+    return state
+    
+    from copy import copy
+from IPython.display import display, clear_output
+import time 
+
+nsteps = 20
+pmove = 0.5
+fenceline = 10
+
+state = copy(initial_state)
+
+fig = plt.figure(figsize=(8,8))
+for i in range(nsteps): 
+    state = evolve_system(state,pmove,fenceline)
+    plotstate(state,time=i)
+    time.sleep(0.01)         # Sleep for 0.01 s to slow down the animation
+    clear_output(wait=True) # Clear output for dynamic display
+    display(fig)            # Reset display
+    fig.clear()             # Prevent overlapping and layered plots
+
+plt.close()                 # Close dynamic display
+
+
+def move_sheep_bias(state,sheep_x,sheep_y,pmove,fenceline,delta):
+
+    # set default "try" position at current position
+    try_x = sheep_x
+    try_y = sheep_y
+    
+    # get dog's position
+    dog_y = np.where(state==3)[0][0]
+    dog_x = np.where(state==3)[1][0]
+    
+    # choose whether to move
+    r1 = np.random.random()
+    if r1 < pmove:
+        # first decide x dir or y dir
+        r2 = np.random.random()
+        if r2 < 0.5:
+            x_or_y = 'x'
+        else:
+            x_or_y = 'y'
+        
+        # choose toward dog or away from dog
+        r3 = np.random.random()
+        if r3 < 0.5 + delta:
+            # move away from dog
+            if x_or_y == 'x':
+                if sheep_x < dog_x:
+                    try_x = sheep_x - 1
+                else:
+                    try_x = sheep_x + 1
+            elif x_or_y == 'y':
+                if sheep_y < dog_y:
+                    try_y = sheep_y - 1
+                else:
+                    # moving up, check if you are at the fenceline
+                    if sheep_y != fenceline:
+                        try_y = sheep_y + 1
+        else:
+            # move towards dog
+            if x_or_y == 'x':
+                if sheep_x < dog_x:
+                    try_x = sheep_x + 1
+                else:
+                    try_x = sheep_x - 1
+            elif x_or_y == 'y':
+                if sheep_y < dog_y:
+                    # moving up, check if you are at the fenceline
+                    if sheep_y != fenceline:
+                        try_y = sheep_y + 1
+                else:
+                    try_y = sheep_y - 1
+    
+        # check and see if the move is good
+        good_move = True
+        if try_x < 0 or try_x >= state.shape[1]:
+            good_move = False
+        elif try_y < 0 or try_y >= state.shape[0]:
+            good_move = False
+        elif state[try_y,try_x] != 0:
+            good_move = False
+            
+        if good_move is True:
+            # make the move
+            state[sheep_y,sheep_x] = 0
+            state[try_y,try_x] = 2
+    
+    return state
+    
+    def evolve_system_bias(state,pmove,fenceline,delta):
+    
+    sheep_loc = np.array(np.where(state==2))
+    nsheep = sheep_loc.shape[1]
+    
+    # write a loop to iterate over each sheep
+    for i in range(nsheep):
+        sheep_x = sheep_loc[1][i]
+        sheep_y = sheep_loc[0][i]
+        # call move_sheep for each sheep_x and sheep_y position
+        state = move_sheep_bias(state,sheep_x,sheep_y,pmove,fenceline,delta)
+
+    return state
+    
+    from IPython.display import display, clear_output
+import time 
+
+nsteps = 500
+plot_every = 10
+pmove = 0.5
+fenceline = 10
+delta = 0.25
+
+state = copy(initial_state)
+
+fig = plt.figure(figsize=(8,8))
+for i in range(nsteps): 
+    state = evolve_system_bias(state,pmove,fenceline,delta)
+    if i % plot_every == 0:
+        plotstate(state,time=i)
+        time.sleep(0.01)         # Sleep for 0.01 s to slow down the animation
+        clear_output(wait=True) # Clear output for dynamic display
+        display(fig)            # Reset display
+        fig.clear()             # Prevent overlapping and layered plots
+
+plt.close()                 # Close dynamic display
+
+def evolve_system_bias_cutoff(state,pmove,fenceline,delta,dcut):
+    # find the dog
+    dog_loc = np.array(np.where(state==3))
+    dog_x = dog_loc[1][0]
+    dog_y = dog_loc[0][0]
+    
+    sheep_loc = np.array(np.where(state==2))
+    
+    # determine how many sheep there are
+    nsheep = sheep_loc.shape[1]
+    
+    # write a loop to iterate over each sheep
+    for i in range(nsheep):
+        sheep_x = sheep_loc[1][i]
+        sheep_y = sheep_loc[0][i]
+        
+        # use distance to dog to decide which move_sheep function to use
+        d = np.sqrt((sheep_x-dog_x)**2+(sheep_y-dog_y)**2)
+        
+        if d < dcut:
+            state = move_sheep_bias(state,sheep_x,sheep_y,pmove,fenceline,delta)
+        else:
+            state = move_sheep(state,sheep_x,sheep_y,pmove,fenceline)  
+        
+
+    return state
+    
+    nsteps = 500
+plot_every = 10
+pmove = 0.5
+fenceline = 10
+delta = 0.25
+dcut = 15
+
+state = copy(initial_state)
+
+fig = plt.figure(figsize=(8,8))
+for i in range(nsteps): 
+    state = evolve_system_bias_cutoff(state,pmove,fenceline,delta,dcut)
+    if i % plot_every == 0:
+        plotstate(state,time=i)
+        time.sleep(0.01)         # Sleep for 0.01 s to slow down the animation
+        clear_output(wait=True) # Clear output for dynamic display
+        display(fig)            # Reset display
+        fig.clear()             # Prevent overlapping and layered plots
+
+plt.close()                 # Close dynamic display
+
+y0,x0 = dog_start_pos
+short_dog_path = [(y0,x0),(y0,x0-1),(y0,x0-2),(y0,x0-1)]
+
+dog_path = [(y0,x0)]
+x = x0
+y = y0
+
+# first run to the left wall
+while x > 0:
+    x -= 1
+    # update x
+    dog_path.append((y, x))   
+    # append (x,y) tuple to dog_path
+
+# then run to the right wall
+while x < nx-1:
+    # update x
+    x += 1
+    # append (x,y) tuple to dog_path
+    dog_path.append((y, x))
+# then run back to the middle
+while x > x0:
+    # update x
+    x -= 1
+    # append (x,y) tuple to dog_path
+    dog_path.append((y, x))
+    
+print(dog_path)
+
+def pathcheck(path):
+    # checks to see if the dog moves more than one square per timestep
+    oldp = path[-1]
+    goodpath = True
+    for p in path:
+        dy = p[0]-oldp[0]
+        dx = p[1]-oldp[1]
+        if abs(dx) + abs(dy) > 1:
+            goodpath = False
+        oldp = p
+    return goodpath
+    
+    def move_dog(state,path,current_pos):
+    
+    # check if the next position is occupied
+    next_pos = current_pos + 1
+    if next_pos >= len(path):
+        next_pos = 0
+    next_y, next_x = path[next_pos]
+    
+    if state[next_y, next_x] == 0 or state[next_y,next_x] == 3:
+        # empty!  or the dog is already there. 
+        # Either way, its ok to move the dog
+    
+        # find the dog
+        dog_loc = np.array(np.where(state==3))
+        dog_x = dog_loc[1][0]
+        dog_y = dog_loc[0][0]
+    
+        # delete dog from current position
+        state[dog_y,dog_x] = 0
+        
+        # add dog to next position
+        state[next_y,next_x] = 3
+        
+        # update current_pos
+        current_pos = next_pos
+    
+    return current_pos, state
+    
+    def evolve_system_dog(state,pmove,fenceline,delta,dcut,path,current_pos):
+    state = evolve_system_bias_cutoff(state,pmove,fenceline,delta,dcut)  
+    current_pos, state = move_dog(state,path,current_pos)
+
+    return current_pos, state
+    
+    nsteps = 20000
+plot_every = 400
+pmove = 0.5
+fenceline = 10
+delta = 0.25
+dcut = 15
+path = dog_path
+dog_pos = 0
+
+state = copy(initial_state)
+
+fig = plt.figure(figsize=(8,8))
+for i in range(nsteps): 
+    dog_pos, state = evolve_system_dog(state,pmove,fenceline,delta,dcut,path,dog_pos)
+    if i % plot_every == 0:
+        plotstate(state,time=i)
+        time.sleep(0.01)         # Sleep for 0.01 s to slow down the animation
+        clear_output(wait=True) # Clear output for dynamic display
+        display(fig)            # Reset display
+        fig.clear()             # Prevent overlapping and layered plots
+
+plt.close()                 # Close dynamic display
+
+def sheep_still_out(state,fenceline):
+    sheep_loc = np.array(np.where(state==2))
+    sheep_still_out = 0
+    for i in range(sheep_loc.shape[1]):
+        if sheep_loc[0][i] > fenceline:
+            sheep_still_out += 1
+    # return the number of sheep that are above the fenceline
+    # in the current state
+    
+    # code here
+
+    return sheep_still_out
+    
+    sheep_still_out(initial_state,10)
+    
+    pmove = 0.5
+fenceline = 10
+delta = 0.25
+dcut = 15
+path = dog_path
+dog_pos = 0
+report_every = 1000
+
+state = copy(initial_state)
+
+i = 0
+while (sheep_still_out(state,fenceline) > 0):
+    i += 1
+    dog_pos, state = evolve_system_dog(state,pmove,fenceline,delta,dcut,path,dog_pos)
+    if i % report_every == 0:
+        print("At time = {0} there are {1} sheep still out".format(i,sheep_still_out(state,fenceline)))
+
+print("All sheep in the pen at time = {0}".format(i))
+
+pmove = 0.5
+fenceline = 10
+delta = 0.25
+dcut = 15
+path = dog_path
+dog_pos = 0
+report_every = 1000
+
+times = []
+
+for x in range(10):
+    state = copy(initial_state)
+
+    i = 0
+    while (sheep_still_out(state,fenceline) > 0):
+        i += 1
+        dog_pos, state = evolve_system_dog(state,pmove,fenceline,delta,dcut,path,dog_pos)
+    times.append(i)
+    
+from math import sqrt
+a = np.array(times)
+print("It takes an average of {0} +- {1} s for this sheepdog to work".format(a.mean(),a.std()/sqrt(len(times))))
+
+y0,x0 = dog_start_pos
+dog_path2 = [(y0,x0)]
+x = x0
+y = y0
+
+# first run to the left wall
+while x > 0:
+    # update x
+    x -= 1
+    # append (x,y) tuple to dog_path
+    dog_path2.append((y, x))
+    
+# then run to y = 30
+while y >= 30:
+    y -= 1
+    dog_path2.append((y, x))   
+# then run to the right wall
+while x < nx-1:
+    # update x
+    x += 1
+    dog_path2.append((y, x))
+# then run back to the top 
+while y < ny-1:
+    y += 1
+    dog_path2.append((y, x))
+# then run back to the middle
+while x > x0:
+    x -= 1
+    dog_path2.append((y, x))
+    
+  nsteps = 1000
+plot_every = 10
+pmove = 0.5
+fenceline = 10
+delta = 0.25
+dcut = 15
+path = dog_path2
+dog_pos = 0
+
+state = copy(initial_state)
+
+fig = plt.figure(figsize=(8,8))
+for i in range(nsteps): 
+    dog_pos, state = evolve_system_dog(state,pmove,fenceline,delta,dcut,path,dog_pos)
+    if i % plot_every == 0:
+        plotstate(state,time=i)
+        time.sleep(0.01)         # Sleep for 0.01 s to slow down the animation
+        clear_output(wait=True) # Clear output for dynamic display
+        display(fig)            # Reset display
+        fig.clear()             # Prevent overlapping and layered plots
+
+plt.close()
+
+pmove = 0.5
+fenceline = 10
+delta = 0.25
+dcut = 15
+path = dog_path2
+dog_pos = 0
+report_every = 1000
+
+state = copy(initial_state)
+
+i = 0
+while (sheep_still_out(state,fenceline) > 0):
+    i += 1
+    dog_pos, state = evolve_system_dog(state,pmove,fenceline,delta,dcut,path,dog_pos)
+    if i % report_every == 0:
+        print("At time = {0} there are {1} sheep still out".format(i,sheep_still_out(state,fenceline)))
+
+print("All sheep in the pen at time = {0}".format(i))
+
+pmove = 0.5
+fenceline = 10
+delta = 0.25
+dcut = 15
+path = dog_path2
+dog_pos = 0
+report_every = 1000
+
+times = []
+
+for x in range(10):
+    state = copy(initial_state)
+
+    i = 0
+    while (sheep_still_out(state,fenceline) > 0):
+        i += 1
+        dog_pos, state = evolve_system_dog(state,pmove,fenceline,delta,dcut,path,dog_pos)
+    times.append(i)
+    
+    
+  from math import sqrt
+a = np.array(times)
+print("It takes an average of {0} +- {1} s for this sheepdog to work".format(a.mean(),a.std()/sqrt(len(times))))
