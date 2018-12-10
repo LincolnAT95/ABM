@@ -1,1 +1,401 @@
+import numpy as np
+% matplotlib inline
+import matplotlib.pyplot as plt
 
+# define our constants
+m = 0.5      # the mass of our particles
+kT = 10000.0     # thermal energy
+gamma = 10.0  # friction coefficient
+dt = 0.00002  # time step
+
+def updatepos(xold,vold,dt):
+    # returns the new positions, using the old positions and the old velocities
+    xnew = xold + vold*dt
+    return xnew
+
+def updatevel(xold,vold,dt,m,gamma,pref):
+    # returns the new velocities, given the old acceleration
+    # which is the sum of the external forces, a drag term, and a random force
+    vnew = vold + dt*(-dUdx(xold)/m - gamma*vold + pref*rfunc(xold.shape))
+    return vnew
+    
+def dUdx(xold):
+    # let's forget about this for now and return an array of zeros
+    f0 = np.array([0,0])
+    return f0
+
+def rfunc(shape):
+    # return a vector with components chosen from a Gaussian distribution
+    r = np.random.normal(size=shape)
+    return r
+    
+    
+x0 = np.array([0,0])    # initial position
+v0 = np.array([1.0,1.0])    # initial velocity
+
+N = 20000   # number of time steps
+npart = 1    # number of particles
+
+save_int = 100  # how often to save the position
+
+def run_1p_simulation(x0,v0,N,save_int,dt,m,gamma,kT):
+    
+    # initialize positions and velocities
+    traj = x0
+    x,v = x0,v0
+    pref = (2*gamma*kT/m)**(0.5)   # prefactor for random force
+                                   # (only compute once and store)
+    
+    # run trajectory forward N steps
+    for step in range(N):
+        xn = updatepos(x,v,dt)
+        vn = updatevel(x,v,dt,m,gamma,pref)
+        x,v = xn,vn
+        if step % save_int == 0:
+            traj = np.row_stack((traj,x))
+        
+    # return trajectory
+    return traj
+    
+  # Put your code here to run the simulation and plot the results
+# Don't forget that the values that you need to feed into the function were already defined above!
+trajectory = run_1p_simulation(x0,v0,N,save_int,dt,m,gamma,kT)
+tx=[]
+ty=[]
+for i in range(len(trajectory)-1):
+    tx.append(trajectory[i][0])
+    ty.append(trajectory[i][1])
+
+plt.plot(tx, ty)
+
+# Put your code here
+print('The final position is',trajectory[len(trajectory)-1])
+
+v0_2 = np.array([0,0])
+p_x = []
+p_y = []
+
+for i in range(20):
+    traj2 = run_1p_simulation(x0,v0_2,N,save_int,dt,m,gamma,kT)
+    final_pos = traj2[-1]
+    p_x.append(final_pos[0])
+    p_y.append(final_pos[1])
+    
+# Put your code here
+x_avg = np.average(p_x)
+y_avg = np.average(p_y)
+
+print('the x average is', x_avg, 'the y average is', y_avg)
+
+A=1
+r0=1
+
+def repel(r):
+    Urep = A*(r0/r)**12
+    return Urep
+
+r = np.linspace(0.9,5,100)
+
+plt.xlabel('r, distance between particles')
+plt.ylabel('U$_{rep}$(r), potential energy')
+plt.plot(r,repel(r))
+plt.plot(1,r0,'p')  # shows the particle radius
+plt.show()
+
+def updatevel_rep(x,v,dmat,dt,m,gamma,pref,rcutsq,r06,r012,A,B,L):
+    # returns the new velocities, given the old acceleration
+    # which is the sum of the external forces, a drag term, and a random force
+    vnew = v + dt*(-dUdx_rep(x,dmat,rcutsq,r06,r012,A,B,L)/m - gamma*v + pref*rfunc(x.shape))
+    return vnew
+    
+def dUdx_rep(x,dmat,rcutsq,r06,r012,A,B,L):
+    # returns the force on each particle in the x and y directions
+
+    npart = len(x)
+    f0 = np.zeros_like(x)
+    for i in range(npart):
+        for j in range(npart):
+            if j != i:
+                # for each particle j that is not equal to i
+                if dmat[i][j] < 2*rcutsq:
+                    # ... and is close enough...
+                    d14 = dmat[i][j]**7
+                    tmp = -12.0*A*r012/d14 
+                    f0[i][0] += tmp*peri_dist(x[i][0],x[j][0],L)
+                    f0[i][1] += tmp*peri_dist(x[i][1],x[j][1],L)
+    return f0
+    
+  def peri_dist(x1,x2,L):
+    # gets the "x" or "y" distance between two particles given a 
+    # periodic box with length L
+    d1 = x1-x2
+    d2 = x1-x2-L
+    d3 = x1-x2+L
+    if abs(d1) < abs(d2):
+        if abs(d1) < abs(d3):
+            return d1
+        else:
+            return d3
+    elif abs(d2) < abs(d3):
+        return d2
+    else:
+        return d3
+
+def getdistancematrix(x,L):
+    # returns a matrix of particle-particle distances
+    # (this is similar the distance matrix from our traveling salesperson problem!)
+    npart = len(x)
+    dmat = np.zeros((npart,npart))
+    for i in range(npart-1):
+        for j in range(i+1,npart):
+            d = (peri_dist(x[i][0],x[j][0],L))**2 + (peri_dist(x[i][1],x[j][1],L))**2
+            dmat[i][j]=d
+            dmat[j][i]=d
+    return dmat
+
+def pbc_check(x,L):
+    # checks if all particles are in the box
+    # if not, it moves them back in
+    for i in range(len(x)):
+        if x[i][0] < 0:
+            x[i][0] += L
+        if x[i][0] > L:
+            x[i][0] -= L
+
+        if x[i][1] < 0:
+            x[i][1] += L
+        if x[i][1] > L:
+            x[i][1] -= L
+    return x
+    
+  def setup_positions(npart,rcutsq):
+    # returns a set of positions for each particle
+    x0 = np.zeros((npart,2))
+    for i in range(npart):
+        allgood = False
+        while (not allgood):
+            x0[i] = np.random.random(size=2)
+
+            # check for clashes
+            allgood = True
+            if i > 0:
+                for j in range(i):
+                    d = peri_dist(x0[i][0],x0[j][0],L)**2 + peri_dist(x0[i][1],x0[j][1],L)**2
+                    if d < 0.6*rcutsq:
+                        allgood = False
+    return x0
+    
+ def run_simulation(N,save_int,dt,kT,m,gamma,npart,r0,A,B,L):
+    pref = (2*gamma*kT/m)**(0.5)   # prefactor for random force
+                                   # (only compute once and store)
+
+    # we'll be doing these calculations a lot, let's do it once and save it    
+    r06 = r0**6
+    r012 = r0**12
+    rcutsq = 2*r0**2
+
+    # this will record our positions as a function of time
+    traj = np.zeros((int(N/save_int),npart,2))
+
+    x0 = setup_positions(npart,rcutsq)   # initial position
+    v0 = np.random.normal(loc=0,scale=0.5,size=(npart,2))  # initial velocity
+
+    x = x0
+    v = v0
+
+    for step in range(N):
+        dmat = getdistancematrix(x,L)  # compute the distance matrix only once per time step
+    
+        xnew = updatepos(x,v,dt)
+        vnew = updatevel_rep(x,v,dmat,dt,m,gamma,pref,rcutsq,r06,r012,A,B,L) 
+        x,v = pbc_check(xnew,L),vnew
+        
+        if step % save_int == 0:
+            frame = int(step/save_int)
+            traj[frame] = x
+
+        if (step+1)*10 % N == 0:
+            pct = int((step+1)*10/N)*10
+            print ("%d percent completed" % pct)
+            
+    return traj
+    
+    
+ N = 20000     # number of time steps
+m = 0.5       # the mass of our particles
+kT = 10000.0  # thermal energy
+gamma = 10.0  # friction coefficient
+dt = 0.00002  # time step
+npart = 20    # number of particles
+r0 = 0.10     # particle size
+L = 1.0       # box size
+A = 0.5       # "repulsion" strength
+B = 0
+save_int = 500  # how often to save the position
+traj = run_simulation(N,save_int,dt,kT,m,gamma,npart,r0,A,B,L)
+
+# show all particle trajectories
+
+% matplotlib inline
+import matplotlib.pyplot as plt
+color=np.array(range(0,int(N/save_int)),dtype='float')
+for i in range(npart):
+    plt.scatter(traj[:,i,0],traj[:,i,1],c=color,edgecolors='none')
+plt.show()
+
+import time
+from IPython.display import display,clear_output
+% matplotlib inline
+import matplotlib.pyplot as plt
+
+def make_traj_movie(traj):
+
+    fig = plt.figure(figsize=(10,10))
+
+    box_x = [0,0,1,1,0]
+    box_y = [0,1,1,0,0]
+    
+    for frame in range(traj.shape[0]):
+        plt.plot(box_x,box_y,'k-')
+        plt.xlim((-0.1,1.1))
+        plt.ylim((-0.1,1.1))
+        for i in range(traj.shape[1]):
+            plt.scatter(traj[frame,i,0],traj[frame,i,1],s=2000)
+        time.sleep(0.1)  
+        clear_output(wait = True)
+        display(fig)            # Reset display
+        fig.clear()             # clear output for animation
+        
+ A2 = np.array([0.1,0.01,0.001])
+save_int = 500
+traj1 = run_simulation(N,save_int,dt,kT,m,gamma,npart,r0,A2[0],B,L)
+   
+traj2 = run_simulation(N,save_int,dt,kT,m,gamma,npart,r0,A2[1],B,L)
+    
+traj3 = run_simulation(N,save_int,dt,kT,m,gamma,npart,r0,A2[2],B,L)
+  
+% matplotlib inline
+import matplotlib.pyplot as plt
+color=np.array(range(0,int(N/save_int)),dtype='float')
+for i in range(npart):
+    plt.scatter(traj1[:,i,0],traj1[:,i,1],c=color,edgecolors='none')
+plt.show()
+
+for i in range(len(traj1)):
+    dist1 = getdistancematrix(traj1[i],L)
+
+# Initial distance comparison
+ini_distance1 = 1    
+
+for j in range(len(dist1)):
+    fin_distance1 = np.min(dist1[np.nonzero(dist1)])
+    
+    if fin_distance1 < ini_distance1:
+        ini_distance1 = fin_distance1
+        
+print(fin_distance1)
+        
+for i in range(len(traj2)):
+    dist2 = getdistancematrix(traj2[i],L)
+
+# Initial distance comparison
+ini_distance2 = 1    
+
+for j in range(len(dist2)):
+    fin_distance2 = np.min(dist2[np.nonzero(dist2)])
+    
+    if fin_distance2 < ini_distance2:
+        ini_distance2 = fin_distance2
+        
+print(fin_distance2)
+        
+for i in range(len(traj3)):
+    dist3 = getdistancematrix(traj3[i],L)
+
+# Initial distance comparison
+ini_distance3 = 1    
+
+for j in range(len(dist1)):
+    fin_distance3 = np.min(dist3[np.nonzero(dist1)])
+    
+    if fin_distance3 < ini_distance3:
+        ini_distance3 = fin_distance3
+        
+print(fin_distance3)
+    
+# Put your code here
+plt.scatter(A2[0],fin_distance1)
+plt.scatter(A2[1],fin_distance2)
+plt.scatter(A2[2],fin_distance3)
+plt.xscale('log')
+plt.xlabel('A')
+plt.ylabel('Lowest distance')
+
+
+A=0.5
+r0=0.1
+B=1.5
+
+def LJ(r):
+    ULJ = A*(r0/r)**12 - B*(r0/r)**6
+    return ULJ
+
+r = np.linspace(0.08,0.3,100)
+
+plt.xlabel('r, distance between particles')
+plt.ylabel('U$_{LJ}$(r), potential energy')
+# Uncomment the line below this once you've finished your LJ function
+plt.plot(r,LJ(r))
+plt.show()
+
+def dUdx_rep(x,dmat,rcutsq,r06,r012,A,B,L):
+    # returns the force on each particle in the x and y directions
+
+    npart = len(x)
+    f0 = np.zeros_like(x)
+    for i in range(npart):
+        for j in range(npart):
+            if j != i:
+                # for each particle j that is not equal to i
+                if dmat[i][j] < 2*rcutsq:
+                    # ... and is close enough...
+                    d14 = dmat[i][j]**7
+                    tmp = -12.0*A*r012/d14 
+                    f0[i][0] += tmp*peri_dist(x[i][0],x[j][0],L)
+                    f0[i][1] += tmp*peri_dist(x[i][1],x[j][1],L)
+    return f0
+    
+# define our constants
+
+m = 0.5      # the mass of our particles
+kT = 10000.0     # thermal energy
+gamma = 0.1  # friction coefficient
+dt = 0.00002  # time step
+N = 40000   # number of time steps
+npart = 25    # number of particles
+r0 = 0.10
+L = 1.0
+A = 0.5
+B = 1.5
+save_int = 500  # how often to save the position
+
+
+# Put your code here
+traj_LJ = run_simulation(N,save_int,dt,kT,m,gamma,npart,r0,A,B,L)
+
+% matplotlib inline
+import matplotlib.pyplot as plt
+color=np.array(range(0,int(N/save_int)),dtype='float')
+for i in range(npart):
+    plt.scatter(traj_LJ[:,i,0],traj_LJ[:,i,1],c=color,edgecolors='none')
+plt.show()
+
+
+for i in range(len(traj_LJ)):
+    dist_LJ0 = np.sqrt(getdistancematrix(traj_LJ[i],L))
+    dist_LJ = np.nonzero(dist_LJ0)
+    
+for j in range(len(dist_LJ0)):
+    dist_LJ = dist_LJ0[j][np.nonzero(dist_LJ0[j])]
+
+plt.hist(dist_LJ, bins = 50, range = (0.05, 0.25))
